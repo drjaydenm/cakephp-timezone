@@ -13,6 +13,8 @@ Place the TimeZoneBehavior.php file in your CakePHP model behaviors folder aka. 
 
 Demo
 ------
+The code needed to activate this behavior needs to be included in the model that you want to automatically convert between timezones. Alternatively, you can place it in the AppModel to affect every model in your Model directory.
+
 For minimal usage, you only need to include the fields section with a list of fields to include
 ```php
 	public $actsAs = array(
