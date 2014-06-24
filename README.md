@@ -13,7 +13,19 @@ Place the TimeZoneBehavior.php file in your CakePHP model behaviors folder aka. 
 
 Demo
 ------
-In model files, use something similair to this
+For minimal usage, you only need to include the fields section with a list of fields to include
+```php
+	public $actsAs = array(
+		"TimeZone" => array(
+			"fields" => array(
+				"created",
+				"modified"
+			)
+		)
+	);
+```
+
+The full API including optional fields and virtual fields is used as below
 ```php
 	public $actsAs = array(
 		"TimeZone" => array(
