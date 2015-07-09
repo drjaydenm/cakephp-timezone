@@ -29,7 +29,7 @@ class TimeZoneBehavior extends modelBehavior {
 	public $timeZoneOptions = array(
 		'fields' => array(),
 		'virtualFields' => array(),
-		'timezone' => "UTC"
+		'timezone' => "America/Los_Angeles"
 	);
 
 	public function setup(Model $model, $config = array()) {
@@ -81,20 +81,35 @@ class TimeZoneBehavior extends modelBehavior {
 								}
 							}
 
-							if ($type == "datetime") {
-								$value = $results[$i][$model->alias][$field];
+							$value = $results[$i][$model->alias][$field];
 
-								$date = DateTime::createFromFormat("Y-m-d H:i:s", $value, new DateTimeZone("UTC"));
+							if ($type == "datetime") {
+								$results[$i][$model->alias][$field."_origtz"] = $value;
+								$date = DateTime::createFromFormat("Y-m-d H:i:s", $value, new DateTimeZone($this->timeZoneOptions['timezone']));
 
 								// Check that the date is valid and throw an error if it isnt
-								if ($date) {
+								if ($date && $date->format('Y') > 0) {
 									$date->setTimeZone(new DateTimeZone($this->options[$model->alias]['timezone']));
 
 									$value = $date->format("d/m/Y h:i A");
 
 									$results[$i][$model->alias][$field] = $value;
 								} else if (!isset($fieldOptions['optional']) || !$fieldOptions['optional']) {
-									throw new Exception("Could not convert the non-optional datetime");
+									throw new Exception("Could not convert the non-optional datetime '".$field."'");
+								}
+							} else if ($type == "date") {
+								$results[$i][$model->alias][$field."_origtz"] = $value;
+								$date = DateTime::createFromFormat("Y-m-d H:i:s", $value, new DateTimeZone($this->timeZoneOptions['timezone']));
+
+								// Check that the date is valid and throw an error if it isnt
+								if ($date && $date->format('Y') > 0) {
+									$date->setTimeZone(new DateTimeZone($this->options[$model->alias]['timezone']));
+
+									$value = $date->format("d/m/Y");
+
+									$results[$i][$model->alias][$field] = $value;
+								} else if (!isset($fieldOptions['optional']) || !$fieldOptions['optional']) {
+									throw new Exception("Could not convert the non-optional datetime '".$field."'");
 								}
 							}
 						}
@@ -110,6 +125,18 @@ class TimeZoneBehavior extends modelBehavior {
 						$fieldKey = $fieldOptions;
 					}
 
+					// Look for the type of the field in the validation data
+					if (isset($model->validate[$fieldKey])) {
+						if (isset($model->validate[$fieldKey]['rule'])) {
+							$type = $model->validate[$fieldKey]['rule'];
+						}
+					}
+
+					// If this isn't a date field, throw an error
+					if ($type != "datetime" && $type != "date") {
+						continue;
+					}
+
 					// Check we have the needed settings
 					if (!isset($fieldValue['format']) || !isset($fieldValue['source'])) {
 						continue;
@@ -119,7 +146,12 @@ class TimeZoneBehavior extends modelBehavior {
 						// If the source field exists in the data then continue
 						if (isset($results[$i][$model->alias][$fieldValue['source']])) {
 							$source = $results[$i][$model->alias][$fieldValue['source']];
-							$date = DateTime::createFromFormat("d/m/Y h:i A", $source, new DateTimeZone($this->options[$model->alias]['timezone']));
+
+							if ($type == "datetime") {
+								$date = DateTime::createFromFormat("d/m/Y h:i A", $source, new DateTimeZone($this->options[$model->alias]['timezone']));
+							} else if ($type == "date") {
+								$date = DateTime::createFromFormat("d/m/Y", $source, new DateTimeZone($this->options[$model->alias]['timezone']));
+							}
 							
 							// Check that the date is valid and throw an error if it isnt
 							if ($date) {
@@ -127,7 +159,7 @@ class TimeZoneBehavior extends modelBehavior {
 
 								$results[$i][$model->alias][$fieldKey] = $source;
 							} else if (!isset($this->options[$model->alias]['fields'][$source]['optional']) || !$this->options[$model->alias]['fields'][$source]['optional']) {
-								throw new Exception("Could not convert the non-optional datetime");
+								throw new Exception("Could not convert the non-optional datetime '".$fieldKey."'");
 							}
 						}
 					}
@@ -170,26 +202,41 @@ class TimeZoneBehavior extends modelBehavior {
 						}
 					}
 
-					if ($type == "datetime") {
-						$value = $model->data[$model->alias][$field];
+					$value = $model->data[$model->alias][$field];
 
+					if ($type == "datetime") {
 						$date = DateTime::createFromFormat("d/m/Y h:i A", $value, new DateTimeZone($this->options[$model->alias]['timezone']));
 
 						// Check that the date is valid and throw an error if it isnt
 						if ($date) {
-							$date->setTimeZone(new DateTimeZone("UTC"));
+							$date->setTimeZone(new DateTimeZone($this->timeZoneOptions['timezone']));
 
 							$value = $date->format("Y-m-d H:i:s");
 
 							$model->data[$model->alias][$field] = $value;
 						} else if (!isset($fieldOptions['optional']) || !$fieldOptions['optional']) {
-							throw new Exception("Could not convert the non-optional datetime");
+							throw new Exception("Could not convert the non-optional datetime '".$field."'");
+						}
+					} else if ($type == "date") {
+						$date = DateTime::createFromFormat("d/m/Y", $value, new DateTimeZone($this->options[$model->alias]['timezone']));
+
+						// Check that the date is valid and throw an error if it isnt
+						if ($date) {
+							// Manually set the hours, minutes and seconds to 0
+							$date->setTime(0, 0, 0);
+							$date->setTimeZone(new DateTimeZone($this->timeZoneOptions['timezone']));
+
+							$value = $date->format("Y-m-d H:i:s");
+
+							$model->data[$model->alias][$field] = $value;
+						} else if (!isset($fieldOptions['optional']) || !$fieldOptions['optional']) {
+							throw new Exception("Could not convert the non-optional date '".$field."'");
 						}
 					}
 				}
 			}
 		}
-
+		
 		return true;
 	}
 }
